@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Accessible Jupyter Lite Pro - Python Edition</title>
+    <script src="https://cdn.jsdelivr.net/pyodide/v0.25.0/full/pyodide.js"></script>
+    <style>
+        :root {
+            --bg: #121212;
+            --text: #ffffff;
+            --accent: #005a9c;
+            --terminal-green: #00ff00;
+            --panel-bg: #1e1e1e;
+        }
+
+        body { font-family: Arial, sans-serif; background: var(--bg); color: var(--text); margin: 0; display: flex; flex-direction: column; height: 100vh; }
+        
+        header { background: var(--accent); padding: 15px; border-bottom: 2px solid #003366; }
+        h1 { margin: 0; font-size: 1.5rem; }
+        
+        /* 1. Intro Section */
+        .intro-box { background: #2a2a2a; padding: 15px 20px; border-bottom: 2px solid #444; line-height: 1.5; font-size: 1.1rem; }
+        .intro-box p { margin: 0 0 10px 0; }
+        .intro-box ul { margin: 0; padding-left: 20px; }
+        .intro-box li { margin-bottom: 5px; }
+
+        /* 2. Toolbar Layout */
+        .toolbar { padding: 15px; background: #222; border-bottom: 2px solid #444; display: flex; gap: 10px; flex-wrap: wrap; }
+        button { padding: 10px 15px; font-size: 1rem; font-weight: bold; background: #333; color: white; border: 2px solid #666; cursor: pointer; border-radius: 4px; }
+        button:focus { outline: 4px solid #ffaa00; background: var(--accent); }
+        .run-btn { background: #1a4d1a; }
+        .download-btn { background: #4b0082; }
+
+        /* 3. Manual Section */
+        .manual-container { margin: 15px; background: var(--panel-bg); border: 2px solid #555; border-radius: 6px; }
+        summary { padding: 15px; font-size: 1.2rem; font-weight: bold; cursor: pointer; background: #333; color: #ddd; }
+        summary:focus { outline: 4px inset #ffaa00; background: var(--accent); }
+        .manual-content { padding: 15px; line-height: 1.6; max-height: 40vh; overflow-y: auto; }
+        .manual-content h3 { color: #ffaa00; border-bottom: 1px solid #555; padding-bottom: 5px; margin-top: 20px; }
+        .manual-content ul, .manual-content ol { margin-left: 20px; padding-left: 10px; }
+        .manual-content li { margin-bottom: 8px; }
+        code { background: #000; color: var(--terminal-green); padding: 2px 6px; border-radius: 4px; font-size: 1.05rem; }
+        
+        main { display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; gap: 15px; padding: 0 15px 15px 15px; flex: 1; overflow: hidden; }
+
+        /* 4. Section Containers */
+        .region { display: flex; flex-direction: column; background: var(--panel-bg); border: 2px solid #555; border-radius: 6px; overflow: hidden; }
+        h2 { margin: 0; padding: 10px; background: #333; font-size: 1.1rem; border-bottom: 2px solid #555; color: #ddd; }
+
+        #codeEditor { flex: 1; padding: 15px; background: #1a1a1a; color: #ddd; font-family: 'Consolas', monospace; font-size: 18px; border: none; resize: none; }
+        #codeEditor:focus { outline: 4px inset #ffaa00; }
+
+        #terminalLog { flex: 1; padding: 15px; background: #000; color: var(--terminal-green); font-family: 'Consolas', monospace; font-size: 1.2rem; overflow-y: auto; }
+        .log-line { margin-bottom: 5px; outline: none; padding: 4px; border-left: 3px solid transparent; }
+        .log-line:focus { background: #333; border-left: 3px solid var(--terminal-green); }
+
+        #figureWindow { padding: 15px; flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; background: #fff; color: #000; overflow: auto; }
+        img { max-width: 100%; height: auto; border: 1px solid #ccc; }
+        
+        .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); border: 0; }
+    </style>
+</head>
+<body>
+
+<header role="banner">
+    <h1>Accessible Jupyter Lite Pro</h1>
+</header>
+
+<section class="intro-box" aria-labelledby="intro-heading">
+    <h2 id="intro-heading" class="sr-only">1. Application Introduction</h2>
+    <p><strong>Welcome to Accessible Jupyter Lite Pro.</strong> This application is a fully accessible, browser-based Python environment tailored for mathematics education. Its primary advantage is providing a seamless hybrid between a traditional Jupyter notebook and a standard command window. All processing happens locally on your machine, ensuring complete privacy with no server installation required.</p>
+    <p><strong>Quick Start:</strong> You do not need to write code from scratch. Simply activate the "Upload File" button below to load an existing Python script (.py) or Jupyter Notebook (.ipynb), and then press "Run Program" to execute it. We highly recommend uploading the provided <code>test1.py</code> file to see the computational features in action.</p>
+    <p><strong>Essential Keyboard Shortcuts:</strong></p>
+    <ul>
+        <li>Press <strong>Alt + 1</strong> to jump directly to the Program Window (Code Editor).</li>
+        <li>Press <strong>Alt + 2</strong> to jump directly to the Command Window (Terminal Output).</li>
+        <li>Press <strong>Alt + 3</strong> to jump directly to the Figure Window (Visual Plots).</li>
+        <li>Press <strong>Shift + Enter</strong> or <strong>Control + Enter</strong> from anywhere to execute your code.</li>
+    </ul>
+</section>
+
+<nav class="toolbar" aria-label="2. Main Toolbar">
+    <input type="file" id="fileUpload" accept=".py,.txt,.ipynb" style="display:none" onchange="processFileUpload(this)">
+    <button onclick="document.getElementById('fileUpload').click()" aria-label="1. Upload File">1. Upload File</button>
+    <button class="run-btn" onclick="executePython()" aria-label="2. Run Program">2. Run Program</button>
+    <button onclick="clearProgram()" aria-label="3. Clear Program Window">3. Clear Program Window</button>
+    <button onclick="clearTerminal()" aria-label="4. Clear Command and Figure Windows">4. Clear Command & Figure</button>
+    <button class="download-btn" onclick="downloadTerminal()" aria-label="5. Download Command Output">5. Download Command Output</button>
+    <button class="download-btn" onclick="downloadFigure()" aria-label="6. Download Plot Figure">6. Download Plot Figure</button>
+</nav>
+
+<details class="manual-container">
+    <summary>3. Expand Application Manual and Module Commands</summary>
+    <div class="manual-content" tabindex="0">
+        <h3>3.1. How to Use This Application</h3>
+        <ol>
+            <li><strong>Upload:</strong> Activate "1. Upload File" to load `.py` scripts or `.ipynb` Jupyter notebooks directly into the editor.</li>
+            <li><strong>Edit:</strong> Write your code in the "Program Window".</li>
+            <li><strong>Execute:</strong> Press `Shift+Enter` or `Control+Enter` from anywhere, or activate "2. Run Program" to execute the code.</li>
+            <li><strong>Review:</strong> Check the "Command Window" for text output and errors. Check the "Figure Window" for generated plots.</li>
+            <li><strong>Export:</strong> Use the download buttons in the toolbar to save your terminal text or generated figures to your local machine.</li>
+        </ol>
+
+        <h3>3.2. Global Keyboard Shortcuts</h3>
+        <ul>
+            <li><code>Alt + 1</code> : Move focus directly to the Program Window (Code Editor).</li>
+            <li><code>Alt + 2</code> : Move focus directly to the Command Window (Terminal).</li>
+            <li><code>Alt + 3</code> : Move focus directly to the Figure Window (Plots).</li>
+            <li><code>Shift + Enter</code> or <code>Ctrl + Enter</code> : Execute the Python code currently in the Program Window.</li>
+        </ul>
+
+        <h3>3.3. NumPy Core Commands (Array Mathematics)</h3>
+        <ol>
+            <li><code>np.array([1, 2, 3])</code> : Create a standard numerical array.</li>
+            <li><code>np.linspace(0, 10, 100)</code> : Generate 100 evenly spaced numbers between 0 and 10.</li>
+            <li><code>np.arange(0, 10, 2)</code> : Generate numbers from 0 to 10 with a step size of 2.</li>
+            <li><code>np.zeros((3, 3))</code> : Create a 3 by 3 matrix filled with zeros.</li>
+            <li><code>np.ones(5)</code> : Create an array of five ones.</li>
+            <li><code>np.sin(x)</code> : Calculate the trigonometric sine for all elements in array x.</li>
+            <li><code>np.cross(vec1, vec2)</code> : Compute the cross product of two vectors.</li>
+            <li><code>np.dot(vec1, vec2)</code> : Compute the dot product of two arrays/vectors.</li>
+            <li><code>np.mean(data)</code> : Calculate the mathematical average of an array.</li>
+            <li><code>np.std(data)</code> : Calculate the standard deviation of an array.</li>
+        </ol>
+
+        <h3>3.4. SymPy Core Commands (Symbolic Mathematics)</h3>
+        <ol>
+            <li><code>x, y = symbols('x y')</code> : Define x and y as symbolic variables.</li>
+            <li><code>diff(sin(x)**2, x)</code> : Calculate the derivative of a function with respect to x.</li>
+            <li><code>integrate(x**2, x)</code> : Calculate the indefinite integral of x squared.</li>
+            <li><code>integrate(x**2, (x, 0, 1))</code> : Calculate the definite integral from 0 to 1.</li>
+            <li><code>limit(sin(x)/x, x, 0)</code> : Calculate the mathematical limit as x approaches 0.</li>
+            <li><code>solve(x**2 - 4, x)</code> : Solve an algebraic equation for x.</li>
+            <li><code>expand((x + 1)**2)</code> : Expand a polynomial expression algebraically.</li>
+            <li><code>factor(x**2 - 2*x + 1)</code> : Factorize a mathematical expression.</li>
+            <li><code>simplify(sin(x)**2 + cos(x)**2)</code> : Simplify an expression to its most basic form.</li>
+            <li><code>Matrix([[1, 2], [3, 4]])</code> : Construct a symbolic mathematical matrix.</li>
+        </ol>
+
+        <h3>3.5. Matplotlib Core Commands (Data Plotting)</h3>
+        <ol>
+            <li><code>plt.plot(x, y)</code> : Create a standard 2D line graph.</li>
+            <li><code>plt.scatter(x, y)</code> : Create a scatter plot of individual data points.</li>
+            <li><code>plt.bar(categories, values)</code> : Create a vertical bar chart.</li>
+            <li><code>plt.title("My Graph")</code> : Add a descriptive title to the top of the plot.</li>
+            <li><code>plt.xlabel("Time (s)")</code> : Label the horizontal X-axis.</li>
+            <li><code>plt.ylabel("Velocity")</code> : Label the vertical Y-axis.</li>
+            <li><code>plt.grid(True)</code> : Enable the background grid lines for easier reading.</li>
+            <li><code>plt.legend()</code> : Display a legend identifying different plotted lines.</li>
+            <li><code>plt.xlim(0, 10)</code> : Manually set the minimum and maximum limits for the X-axis.</li>
+            <li><code>plt.show()</code> : Render the final plot (Automatically mapped to the Figure Window).</li>
+        </ol>
+
+        <h3>3.6. SciPy Core Commands (Optimization & Analytics)</h3>
+        <ol>
+            <li><code>linprog(c, A_ub, b_ub, bounds)</code> : Solve a linear programming problem to minimize an objective function subject to linear equality and inequality constraints.</li>
+            <li><code>milp(c, integrality, constraints, bounds)</code> : Solve a mixed-integer linear programming problem where some variables are restricted to integer values.</li>
+            <li><code>differential_evolution(func, bounds)</code> : Find the global minimum of a multivariate function using stochastic population-based optimization.</li>
+            <li><code>optimize.root(func, x0)</code> : Find the root of a vector function starting from an initial guess x0.</li>
+            <li><code>integrate.quad(func, a, b)</code> : Compute a definite integral numerically from a to b.</li>
+        </ol>
+    </div>
+</details>
+
+<main>
+    <section class="region" style="grid-row: 1 / 3;" aria-labelledby="heading-editor">
+        <h2 id="heading-editor">4. Program Window (Alt+1)</h2>
+        <textarea id="codeEditor" spellcheck="false" aria-label="Python Code Editor"></textarea>
+    </section>
+
+    <section class="region" aria-labelledby="heading-terminal">
+        <h2 id="heading-terminal">5. Command Window (Alt+2)</h2>
+        <div id="terminalLog" role="log" aria-live="assertive" aria-relevant="additions" tabindex="-1">
+            <div class="log-line" tabindex="0">1. System initializing. Downloading Scientific Python Engine...</div>
+        </div>
+    </section>
+
+    <section class="region" aria-labelledby="heading-figure">
+        <h2 id="heading-figure">6. Figure Window (Alt+3)</h2>
+        <div id="figureWindow" tabindex="0" aria-live="polite"></div>
+    </section>
+</main>
+
+<script>
+    const editor = document.getElementById('codeEditor');
+    const log = document.getElementById('terminalLog');
+    const figWindow = document.getElementById('figureWindow');
+    let isEngineReady = false;
+    let pyodide = null;
+    let lineCounter = 1;
+
+    // 1. Core Engine Initialization
+    async function initEnvironment() {
+        try {
+            pyodide = await loadPyodide();
+            appendTerminal("Downloading Matplotlib, Numpy, Scipy, and Sympy libraries...");
+            
+            await pyodide.loadPackage(['numpy', 'matplotlib', 'sympy', 'scipy']);
+            
+            // 2. Updated Engine Configuration
+            pyodide.runPython(`
+                import sys
+                import io
+                import base64
+                import js
+                import builtins
+                import matplotlib.pyplot as plt
+                import scipy
+
+                # Reroute standard output
+                class HTMLTerminalOutput:
+                    def write(self, text):
+                        if text.strip(): js.appendTerminal(text.strip())
+                    def flush(self): pass
+                
+                sys.stdout = HTMLTerminalOutput()
+                sys.stderr = HTMLTerminalOutput()
+
+                # Reroute standard input
+                def accessible_browser_input(prompt_text=""):
+                    print(prompt_text) 
+                    result = js.prompt(prompt_text)
+                    return result if result else ""
+                
+                builtins.input = accessible_browser_input
+
+                # Reroute visual plots
+                def render_to_html(*args, **kwargs):
+                    buf = io.BytesIO()
+                    plt.savefig(buf, format='png')
+                    buf.seek(0)
+                    img_data = base64.b64encode(buf.read()).decode('utf-8')
+                    js.displayFigure(img_data)
+                    plt.clf()
+                    print("Visual Output: Plot rendered successfully in 6. Figure Window.")
+
+                plt.show = render_to_html
+            `);
+            
+            isEngineReady = true;
+            log.innerHTML = ''; // Clear loading logs
+            lineCounter = 1;
+            appendTerminal("System Ready. You may now execute code or upload notebooks.");
+        } catch (err) {
+            appendTerminal("CRITICAL ERROR: " + err.message);
+        }
+    }
+
+    // 3. Terminal Append Logic
+    window.appendTerminal = function(text) {
+        const line = document.createElement('div');
+        line.className = 'log-line';
+        line.tabIndex = 0; 
+        line.textContent = lineCounter + ". > " + text;
+        log.appendChild(line);
+        log.scrollTop = log.scrollHeight;
+        lineCounter++;
+        return line;
+    };
+
+    // 4. Figure Rendering Logic
+    window.displayFigure = function(base64Image) {
+        figWindow.innerHTML = `
+            <h3 class="sr-only">New scientific plot generated</h3>
+            <img src="data:image/png;base64,${base64Image}" alt="Data plot generated by Matplotlib" />
+        `;
+    };
+
+    // 5. Execution Engine
+    async function executePython() {
+        if (!isEngineReady) return appendTerminal("Error: Engine still loading.");
+        appendTerminal("--- Executing Program ---");
+        try {
+            await pyodide.runPythonAsync(editor.value);
+            appendTerminal("--- Execution Complete ---").focus();
+        } catch (err) {
+            appendTerminal("PYTHON ERROR: " + err.message).focus();
+        }
+    }
+
+    // 6. File Upload Handler
+    function processFileUpload(input) {
+        const file = input.files[0];
+        if (!file) return;
+        
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            const content = e.target.result;
+            
+            if (file.name.endsWith('.ipynb')) {
+                try {
+                    const notebook = JSON.parse(content);
+                    let pythonCode = "";
+                    notebook.cells.forEach(cell => {
+                        if (cell.cell_type === 'code') pythonCode += cell.source.join('') + '\n\n';
+                    });
+                    editor.value = pythonCode.trim();
+                    appendTerminal("Notebook parsed. Code moved to Program Window.").focus();
+                } catch (err) {
+                    appendTerminal("Error parsing notebook: " + err.message).focus();
+                }
+            } else {
+                editor.value = content;
+                appendTerminal("File loaded: " + file.name).focus();
+            }
+        };
+        reader.readAsText(file);
+    }
+
+    // 7. Clear Program Window
+    function clearProgram() {
+        editor.value = '';
+        editor.focus();
+        appendTerminal("Program Window Cleared.");
+    }
+
+    // 8. Clear Command and Figure Window
+    function clearTerminal() {
+        log.innerHTML = '';
+        lineCounter = 1;
+        figWindow.innerHTML = '';
+        appendTerminal("Command and Figure Windows Cleared.");
+    }
+
+    // 9. Download Function: Terminal Log
+    window.downloadTerminal = function() {
+        const logs = document.querySelectorAll('.log-line');
+        let textContent = "Accessible Jupyter Lite Pro - Command Output Log\\n\\n";
+        logs.forEach(line => {
+            textContent += line.textContent + "\\n";
+        });
+        
+        const blob = new Blob([textContent], { type: 'text/plain' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'terminal_output.txt';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        
+        appendTerminal("Success: Command output downloaded to your device.").focus();
+    };
+
+    // 10. Download Function: Figure Image
+    window.downloadFigure = function() {
+        const img = document.querySelector('#figureWindow img');
+        if (!img) {
+            appendTerminal("Error: No plot figure available to download yet.").focus();
+            return;
+        }
+        
+        const a = document.createElement('a');
+        a.href = img.src;
+        a.download = 'scientific_plot.png';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        
+        appendTerminal("Success: Plot figure downloaded to your device.").focus();
+    };
+
+    // 11. NVDA Navigation Hotkeys
+    window.addEventListener('keydown', (e) => {
+        if (e.altKey && e.key === '1') { e.preventDefault(); editor.focus(); }
+        if (e.altKey && e.key === '2') { e.preventDefault(); log.focus(); }
+        if (e.altKey && e.key === '3') { e.preventDefault(); figWindow.focus(); }
+        if ((e.shiftKey || e.ctrlKey) && e.key === 'Enter') { e.preventDefault(); executePython(); }
+    });
+
+    initEnvironment();
+</script>
+</body>
+</html>
